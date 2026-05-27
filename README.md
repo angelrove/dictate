@@ -8,6 +8,26 @@ Script de dictado por voz para Linux/Wayland. Transcribe voz a texto y lo copia 
 - **Pulsar atajo de nuevo**: Detiene el dictado, copia texto al portapapeles (suena confirmación)
 - **Pegar manualmente**: `Ctrl+V` donde quieras el texto
 
+## Puntuación por voz
+
+El modelo pequeño de Vosk no incluye puntuación automática. El script añade reglas básicas para detectar preguntas y comandos de voz:
+
+### Comandos de puntuación
+
+| Palabra dicha | Símbolo insertado |
+|---|---|
+| `coma` | `,` |
+| `dos puntos` | `:` |
+
+### Preguntas automáticas
+
+El script añade automáticamente `¿` y `?` cuando detecta palabras interrogativas al inicio de una frase:
+
+- `qué`, `cómo`, `cuándo`, `dónde`, `quién`, `cuál`, `cuánto`
+- `puede`, `puedes`, `podría`, `quieres`, `sabe`, `sabes`, `hay`, `tiene`, `tienes`
+
+**Ejemplo**: Si dices *"qué hora es"* → se transcribe como *"¿Qué hora es?"*
+
 ## Instalación
 
 ### 1. Dependencias del sistema
