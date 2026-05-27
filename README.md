@@ -8,7 +8,7 @@ Script de dictado por voz para Linux/Wayland. Transcribe voz a texto y lo copia 
 - **Pulsar atajo de nuevo**: Detiene el dictado, copia texto al portapapeles (suena confirmación)
 - **Pegar manualmente**: `Ctrl+V` donde quieras el texto
 
-## Instalación en otro ordenador
+## Instalación
 
 ### 1. Dependencias del sistema
 
