@@ -46,7 +46,7 @@ chmod +x ~/scripts/dictar.py
 2. Bajar a **Atajos personalizados**
 3. Pulsar **+** para añadir uno nuevo
 4. **Nombre**: `Dictar`
-5. **Comando**: `python3 /home/TU_USUARIO/scripts/dictar.py`
+5. **Comando**: `python3 /home/TU_USUARIO/dictate/dictar.py`
 6. Al pulsar "Definir atajo", presionar la tecla **Pause** (o la que prefieras)
 
 ## Requisitos
