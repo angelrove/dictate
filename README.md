@@ -1,56 +1,62 @@
-# Dictar - Voz a Texto
+# Dictar - Voz a Texto con Whisper
 
-Script de dictado por voz para Linux/Wayland. Transcribe voz a texto y lo copia al portapapeles automáticamente.
+Script de dictado por voz para Linux/Wayland. Graba tu voz mientras mantienes un atajo, transcribe el audio con **OpenAI Whisper** ejecutándose localmente y copia el resultado al portapapeles.
 
-## Cómo funciona
+## Características
 
-- **Pulsar atajo una vez**: Inicia el dictado (suena confirmación)
-- **Pulsar atajo de nuevo**: Detiene el dictado, copia texto al portapapeles (suena confirmación)
-- **Pegar manualmente**: `Ctrl+V` donde quieras el texto
+- **Pulsar atajo una vez**: inicia la grabación (suena confirmación).
+- **Pulsar atajo de nuevo**: detiene la grabación, transcribe con IA y copia el texto al portapapeles (suena confirmación).
+- **Pegar manualmente**: `Ctrl+V` donde quieras el texto.
+- **Puntuación automática**: Whisper añade comas, puntos, interrogaciones y mayúsculas sin reglas manuales.
+- **Multilingüe**: entiende español mezclado con palabras sueltas en inglés.
+- **Vocabulario técnico**: incluye un *prompt* con términos informáticos (Git, npm, bun, Docker, Kubernetes, etc.) para mejorar el reconocimiento.
+- **Todo local**: no se envía nada a la nube.
 
-## Puntuación por voz
+## Requisitos
 
-El modelo pequeño de Vosk no incluye puntuación automática. El script añade reglas básicas para detectar preguntas y comandos de voz:
+- Linux con Wayland (GNOME, KDE, Sway, etc.)
+- Python 3.8+
+- Micrófono configurado
+- ~2.5 GB de RAM libres para el modelo `large-v3-turbo`
+- ~1.6 GB de espacio en disco para el modelo descargado
 
-### Comandos de puntuación
+## Dependencias
 
-| Palabra dicha | Símbolo insertado |
+| Paquete | Función |
 |---|---|
-| `coma` | `,` |
-| `dos puntos` | `:` |
-
-### Preguntas automáticas
-
-El script añade automáticamente `¿` y `?` cuando detecta palabras interrogativas al inicio de una frase:
-
-- `qué`, `cómo`, `cuándo`, `dónde`, `quién`, `cuál`, `cuánto`
-- `puede`, `puedes`, `podría`, `quieres`, `sabe`, `sabes`, `hay`, `tiene`, `tienes`
-
-**Ejemplo**: Si dices *"qué hora es"* → se transcribe como *"¿Qué hora es?"*
+| `sounddevice` | Captura de audio del micrófono |
+| `wl-clipboard` | Copiar texto al portapapeles de Wayland |
+| `pipewire` | Reproducir sonidos de confirmación |
+| `build-essential`, `cmake`, `git` | Compilar whisper.cpp |
 
 ## Instalación
 
 ### 1. Dependencias del sistema
 
 ```bash
-sudo apt install -y wl-clipboard pipewire-audio-client-libraries
+sudo apt install -y build-essential cmake git wl-clipboard pipewire-audio-client-libraries
 ```
+
+> Si no puedes usar `sudo`, instala `cmake` con `pip3 install --user --break-system-packages cmake` y asegúrate de que `~/.local/bin` esté en tu `PATH`.
 
 ### 2. Paquetes de Python
 
 ```bash
-pip3 install sounddevice vosk
+pip3 install sounddevice
 ```
 
-### 3. Descargar modelo Vosk (español)
+### 3. Compilar whisper.cpp y descargar el modelo
 
 ```bash
-mkdir -p ~/.cache/vosk
-cd ~/.cache/vosk
-wget https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip
-unzip vosk-model-small-es-0.42.zip
-rm vosk-model-small-es-0.42.zip
+mkdir -p ~/.local/src
+git clone https://github.com/ggerganov/whisper.cpp.git ~/.local/src/whisper.cpp
+cd ~/.local/src/whisper.cpp
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j --config Release
+bash models/download-ggml-model.sh large-v3-turbo
 ```
+
+Esto descarga el modelo `ggml-large-v3-turbo.bin` (~1.6 GB), un buen equilibrio entre precisión y velocidad en CPU.
 
 ### 4. Colocar el script
 
@@ -69,31 +75,56 @@ chmod +x ~/scripts/dictar.py
 5. **Comando**: `python3 /home/TU_USUARIO/dictate/dictar.py`
 6. Al pulsar "Definir atajo", presionar la tecla **Pause** (o la que prefieras)
 
-## Requisitos
+## Uso
 
-- Linux con Wayland (GNOME, KDE, Sway, etc.)
-- Python 3.8+
-- Micrófono configurado
-
-## Dependencias
-
-| Paquete | Función |
-|---|---|
-| `sounddevice` | Captura de audio del micrófono |
-| `vosk` | Motor de reconocimiento de voz |
-| `wl-clipboard` | Copiar texto al portapapeles de Wayland |
-| `pipewire` | Reproducir sonidos de confirmación |
-
-## Modelo
-
-- **vosk-model-small-es-0.42** (39MB) - Español, streaming en tiempo real
-- Se descarga automáticamente a `~/.cache/vosk/`
+1. Pulsa el atajo configurado.
+2. Habla con naturalidad. Puedes mezclar español con palabras en inglés.
+3. Vuelve a pulsar el atajo.
+4. Espera un segundo mientras Whisper transcribe.
+5. Pega el texto con `Ctrl+V`.
 
 ## Personalización
 
+### Cambiar el modelo
+
+Edita la variable `MODEL_PATH` en `dictar.py` o descarga otro modelo:
+
+```bash
+cd ~/.local/src/whisper.cpp
+bash models/download-ggml-model.sh medium
+```
+
+Modelos recomendados:
+
+| Modelo | Precisión | Velocidad en CPU | RAM aprox. |
+|---|---|---|---|
+| `small` | Buena | Rápida | ~1 GB |
+| `medium` | Muy buena | Media | ~2.1 GB |
+| `large-v3-turbo` | Excelente | Rápida | ~2.3 GB |
+| `large-v3` | Máxima | Lenta | ~3.9 GB |
+
+### Cambiar el idioma
+
+Edita la variable `LANGUAGE` en `dictar.py`. Algunos valores útiles:
+
+- `"es"` — español (predeterminado)
+- `"en"` — inglés
+- `"auto"` — detección automática (añade algo de latencia)
+
+### Añadir vocabulario propio
+
+Edita la variable `PROMPT` en `dictar.py` con palabras o frases que uses habitualmente. Esto ayuda a Whisper a reconocer nombres propios, tecnologías o jerga de tu campo.
+
+```python
+PROMPT = (
+    "Git, npm, bun, Docker, Kubernetes, "
+    "aquí tus propias palabras."
+)
+```
+
 ### Cambiar el sonido de confirmación
 
-Editar las líneas con `pw-play` en el script. Sonidos disponibles:
+Edita las llamadas a `play_sound(...)` en `dictar.py`. Algunos sonidos disponibles:
 
 ```
 /usr/share/sounds/freedesktop/stereo/bell.oga
@@ -102,10 +133,35 @@ Editar las líneas con `pw-play` en el script. Sonidos disponibles:
 /usr/share/sounds/freedesktop/stereo/message-new-instant.oga
 ```
 
-### Cambiar el modelo de idioma
+## Solución de problemas
 
-Descargar otro modelo de https://alphacephei.com/vosk/models y actualizar la ruta en el script:
+### whisper-cli no se encuentra
 
-```python
-model_path = os.path.expanduser("~/.cache/vosk/vosk-model-small-en-us-0.15")
+Asegúrate de que whisper.cpp se compiló correctamente:
+
+```bash
+ls ~/.local/src/whisper.cpp/build/bin/whisper-cli
 ```
+
+### El modelo no se encuentra
+
+```bash
+ls ~/.local/src/whisper.cpp/models/ggml-large-v3-turbo.bin
+```
+
+### La transcripción tarda mucho
+
+- Prueba un modelo más pequeño (`medium` o `small`).
+- Asegúrate de que whisper.cpp se compiló con soporte OpenMP/AVX (debería hacerlo por defecto en x86_64).
+
+### No se copia al portapapeles
+
+Verifica que `wl-copy` está instalado:
+
+```bash
+which wl-copy
+```
+
+## Licencia
+
+El script `dictar.py` es de uso libre. whisper.cpp y los modelos Whisper tienen sus propias licencias (MIT y CC BY-SA 4.0 respectivamente).
