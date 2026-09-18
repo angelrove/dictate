@@ -23,10 +23,11 @@ _log_file = None
 
 
 def _init_log():
-    """Abre el archivo de log en modo escritura (reinicia en cada ejecución)."""
+    """Abre el archivo de log en modo append para no perder entradas ni
+    dejar huecos de bytes nulos cuando dos procesos escriben en el mismo log."""
     global _log_file
     os.makedirs(LOG_DIR, exist_ok=True)
-    _log_file = open(LOG_FILE, "w", encoding="utf-8")
+    _log_file = open(LOG_FILE, "a", encoding="utf-8")
 
 
 def log(level, message, *args):
@@ -51,6 +52,27 @@ def log_warning(message, *args):
 def log_error(message, *args):
     log("ERROR", message, *args)
 
+def _load_env_file(filename=".env"):
+    """Carga variables de entorno desde un fichero .env en la carpeta del script."""
+    env_path = os.path.join(LOG_DIR, filename)
+    if not os.path.exists(env_path):
+        return
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip("\"'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except Exception:
+        pass
+
+
+_load_env_file()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 MODEL = "gpt-transcribe"
 PROMPT = "Dictado informal de un desarrollador de software."

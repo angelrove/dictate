@@ -30,43 +30,48 @@ Script de dictado por voz para Linux/Wayland. Graba tu voz mientras mantienes un
 
 ## Instalación
 
-### 1. Dependencias del sistema
+### 1. Clonar el repositorio
 
 ```bash
-sudo apt install -y wl-clipboard pipewire-audio-client-libraries
+git clone <URL_DEL_REPO> ~/dictar
+cd ~/dictar
 ```
 
-### 2. Paquetes de Python
+### 2. Ejecutar el script de instalación
 
 ```bash
-pip3 install --user --break-system-packages openai sounddevice
+./install.sh
 ```
+
+Este script:
+- Instala las dependencias del sistema (`wl-clipboard`, `pipewire-audio-client-libraries`, `python3`, `python3-pip`).
+- Instala las dependencias de Python desde `requirements.txt`.
+- Crea un enlace simbólico en `~/scripts/dictar.py`.
+- Crea un fichero `.env` vacío para la API key.
+
+> Requiere `sudo` para instalar paquetes del sistema.
 
 ### 3. Configurar la API key de OpenAI
 
 Obtén una API key en [platform.openai.com](https://platform.openai.com).
 
-Añade esto a tu `~/.bashrc` o `~/.zshrc`:
+Edita el fichero `.env` creado en el paso anterior:
 
 ```bash
-export OPENAI_API_KEY="sk-..."
+nano /ruta/a/dictar/.env
 ```
 
-Recarga la configuración:
+Y añade tu clave:
 
 ```bash
-source ~/.bashrc
+OPENAI_API_KEY=sk-...
 ```
 
-### 4. Colocar el script
+> El permiso `600` hace que solo tu usuario pueda leer la API key.
 
-```bash
-mkdir -p ~/scripts
-cp dictar.py ~/scripts/dictar.py
-chmod +x ~/scripts/dictar.py
-```
+El script lee automáticamente `.env` si la variable de entorno no está definida, así que funciona tanto desde la terminal como desde atajos de teclado del escritorio.
 
-### 5. Configurar atajo de teclado (GNOME)
+### 4. Configurar atajo de teclado (GNOME)
 
 1. Ir a **Configuración → Teclado → Atajos de teclado**
 2. Bajar a **Atajos personalizados**
@@ -133,13 +138,21 @@ Edita las llamadas a `play_sound(...)` en `dictar.py`. Algunos sonidos disponibl
 
 ### "Error: no se encontró OPENAI_API_KEY"
 
-La variable de entorno no está definida. Verifica:
+La variable de entorno no está definida y el script no ha podido leer el fichero `.env`.
+
+Verifica que existe:
 
 ```bash
-echo $OPENAI_API_KEY
+ls -la /ruta/a/dictar/.env
 ```
 
-Si está vacía, añádela a tu `~/.bashrc` y recarga.
+Y que contiene la línea:
+
+```bash
+OPENAI_API_KEY=sk-...
+```
+
+Si está vacía, configúrala siguiendo el paso 3 de instalación.
 
 ### "Error de autenticación con OpenAI"
 
@@ -175,7 +188,7 @@ dictar.log
 cat /ruta/a/dictar/dictar.log
 ```
 
-El log se reinicia en cada ejecución, por lo que solo contiene información de la última vez que usaste el dictado. No guarda el texto transcrito.
+El log añade nuevas entradas en cada ejecución (modo append), por lo que conserva el historial de las últimas ejecuciones. No guarda el texto transcrito.
 
 ## Nota sobre privacidad
 
