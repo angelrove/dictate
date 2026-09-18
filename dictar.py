@@ -53,6 +53,8 @@ def play_sound(path):
 
 def transcribe_audio():
     """Transcribe el WAV con whisper.cpp y devuelve el texto limpio."""
+    global whisper_proc
+
     if not os.path.exists(WAV_FILE) or os.path.getsize(WAV_FILE) < 1024:
         return ""
 
@@ -68,14 +70,14 @@ def transcribe_audio():
     ]
 
     try:
-        result = subprocess.run(
+        whisper_proc = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            check=False,
-            timeout=120,
         )
-        text = result.stdout.strip()
+        stdout, stderr = whisper_proc.communicate(timeout=TRANSCRIBE_TIMEOUT)
+        text = stdout.strip()
         # whisper-cli puede devolver líneas en blanco o metadata; nos quedamos con el texto
         lines = [
             line.strip()
@@ -85,26 +87,72 @@ def transcribe_audio():
         if lines:
             return " ".join(lines)
         return ""
-    except Exception as e:
-        print(f"Error transcribiendo: {e}", file=sys.stderr)
+    except subprocess.TimeoutExpired:
+        print(f"[dictar] La transcripción tardó más de {TRANSCRIBE_TIMEOUT}s. Cancelando.", file=sys.stderr)
+        if whisper_proc is not None:
+            whisper_proc.kill()
+            try:
+                whisper_proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
         return ""
+    except Exception as e:
+        print(f"[dictar] Error transcribiendo: {e}", file=sys.stderr)
+        if whisper_proc is not None:
+            try:
+                whisper_proc.kill()
+            except Exception:
+                pass
+        return ""
+    finally:
+        whisper_proc = None
 
 
-def save_and_exit(signum, frame):
-    global stream, wav_file
-
-    # Sonido de confirmación al terminar
-    play_sound("/usr/share/sounds/freedesktop/stereo/bell.oga")
+def cleanup(kill_whisper=True):
+    """Limpia recursos, archivos temporales y procesos hijos."""
+    global stream, wav_file, whisper_proc
 
     # Detener grabación y cerrar WAV
     try:
         if stream is not None:
             stream.stop()
             stream.close()
+    except Exception:
+        pass
+    try:
         if wav_file is not None:
             wav_file.close()
     except Exception:
         pass
+
+    # Matar whisper-cli si aún está corriendo
+    if kill_whisper and whisper_proc is not None:
+        try:
+            if whisper_proc.poll() is None:
+                whisper_proc.kill()
+                whisper_proc.communicate(timeout=5)
+        except Exception:
+            pass
+
+    # Eliminar archivos temporales
+    if os.path.exists(PID_FILE):
+        try:
+            os.remove(PID_FILE)
+        except Exception:
+            pass
+    if os.path.exists(WAV_FILE):
+        try:
+            os.remove(WAV_FILE)
+        except Exception:
+            pass
+
+
+def save_and_exit(signum, frame):
+    # Ignorar señales adicionales mientras terminamos para evitar reentrada
+    signal.signal(signal.SIGUSR1, signal.SIG_IGN)
+
+    # Sonido de confirmación al terminar
+    play_sound("/usr/share/sounds/freedesktop/stereo/bell.oga")
 
     texto = transcribe_audio()
 
@@ -117,34 +165,55 @@ def save_and_exit(signum, frame):
             check=False,
         )
 
-    # Limpieza antes de salir
-    if os.path.exists(PID_FILE):
-        os.remove(PID_FILE)
-    if os.path.exists(WAV_FILE):
-        os.remove(WAV_FILE)
-
+    cleanup(kill_whisper=True)
     os._exit(0)
+
+
+def signal_handler(signum, frame):
+    """Maneja SIGTERM/SIGINT limpiando antes de salir."""
+    cleanup(kill_whisper=True)
+    os._exit(0)
+
+
+def kill_orphan_whisper_processes():
+    """Mata procesos whisper-cli huérfanos de ejecuciones anteriores."""
+    subprocess.run(
+        ["pkill", "-f", f"{WHISPER_BIN}.*{WAV_FILE}"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
 
 
 # Lógica de detección de doble pulsación
 if os.path.exists(PID_FILE):
-    with open(PID_FILE, "r") as f:
-        pid = int(f.read())
     try:
-        os.kill(pid, signal.SIGUSR1)
-        sys.exit(0)
-    except (ProcessLookupError, ValueError):
-        pass
+        with open(PID_FILE, "r") as f:
+            pid = int(f.read().strip())
+        if pid != os.getpid():
+            try:
+                os.kill(pid, signal.SIGUSR1)
+                sys.exit(0)
+            except ProcessLookupError:
+                # El proceso ya no existe; limpiar archivo obsoleto
+                os.remove(PID_FILE)
+            except ValueError:
+                os.remove(PID_FILE)
+    except (ValueError, OSError):
+        try:
+            os.remove(PID_FILE)
+        except OSError:
+            pass
 
-# Guardar el PID del proceso actual
+# Matar whisper-cli huérfanos y guardar el PID del proceso actual
+kill_orphan_whisper_processes()
 with open(PID_FILE, "w") as f:
     f.write(str(os.getpid()))
 
-# Registrar la señal de apagado
+# Registrar señales
 signal.signal(signal.SIGUSR1, save_and_exit)
-
-stream = None
-wav_file = None
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
 
 try:
     device_info = sd.query_devices(None, "input")
@@ -177,13 +246,5 @@ try:
 
 except Exception as e:
     print(f"Error: {e}", file=sys.stderr)
-    if wav_file is not None:
-        try:
-            wav_file.close()
-        except Exception:
-            pass
-    if os.path.exists(PID_FILE):
-        os.remove(PID_FILE)
-    if os.path.exists(WAV_FILE):
-        os.remove(WAV_FILE)
+    cleanup(kill_whisper=True)
     sys.exit(1)
