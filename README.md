@@ -1,62 +1,62 @@
-# Dictar - Voz a Texto con Whisper
+# Dictar - Voz a Texto con OpenAI API
 
-Script de dictado por voz para Linux/Wayland. Graba tu voz mientras mantienes un atajo, transcribe el audio con **OpenAI Whisper** ejecutándose localmente y copia el resultado al portapapeles.
+Script de dictado por voz para Linux/Wayland. Graba tu voz mientras mantienes un atajo, envía el audio a la API de **OpenAI (`gpt-transcribe`)** y copia el resultado al portapapeles.
 
 ## Características
 
 - **Pulsar atajo una vez**: inicia la grabación (suena confirmación).
 - **Pulsar atajo de nuevo**: detiene la grabación, transcribe con IA y copia el texto al portapapeles (suena confirmación).
 - **Pegar manualmente**: `Ctrl+V` donde quieras el texto.
-- **Puntuación automática**: Whisper añade comas, puntos, interrogaciones y mayúsculas sin reglas manuales.
+- **Puntuación automática**: el modelo añade comas, puntos, interrogaciones y mayúsculas.
 - **Multilingüe**: entiende español mezclado con palabras sueltas en inglés.
-- **Vocabulario técnico**: incluye un *prompt* con términos informáticos (Git, npm, bun, Docker, Kubernetes, etc.) para mejorar el reconocimiento.
-- **Todo local**: no se envía nada a la nube.
+- **Rápido**: la transcripción corre en los servidores de OpenAI, no en tu CPU.
 
 ## Requisitos
 
 - Linux con Wayland (GNOME, KDE, Sway, etc.)
 - Python 3.8+
 - Micrófono configurado
-- ~2.5 GB de RAM libres para el modelo `large-v3-turbo`
-- ~1.6 GB de espacio en disco para el modelo descargado
+- Conexión a internet
+- Una **API key de OpenAI** con crédito disponible
 
 ## Dependencias
 
 | Paquete | Función |
 |---|---|
 | `sounddevice` | Captura de audio del micrófono |
+| `openai` | Cliente de la API de OpenAI |
 | `wl-clipboard` | Copiar texto al portapapeles de Wayland |
 | `pipewire` | Reproducir sonidos de confirmación |
-| `build-essential`, `cmake`, `git` | Compilar whisper.cpp |
 
 ## Instalación
 
 ### 1. Dependencias del sistema
 
 ```bash
-sudo apt install -y build-essential cmake git wl-clipboard pipewire-audio-client-libraries
+sudo apt install -y wl-clipboard pipewire-audio-client-libraries
 ```
-
-> Si no puedes usar `sudo`, instala `cmake` con `pip3 install --user --break-system-packages cmake` y asegúrate de que `~/.local/bin` esté en tu `PATH`.
 
 ### 2. Paquetes de Python
 
 ```bash
-pip3 install sounddevice
+pip3 install --user --break-system-packages openai sounddevice
 ```
 
-### 3. Compilar whisper.cpp y descargar el modelo
+### 3. Configurar la API key de OpenAI
+
+Obtén una API key en [platform.openai.com](https://platform.openai.com).
+
+Añade esto a tu `~/.bashrc` o `~/.zshrc`:
 
 ```bash
-mkdir -p ~/.local/src
-git clone https://github.com/ggerganov/whisper.cpp.git ~/.local/src/whisper.cpp
-cd ~/.local/src/whisper.cpp
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j --config Release
-bash models/download-ggml-model.sh large-v3-turbo
+export OPENAI_API_KEY="sk-..."
 ```
 
-Esto descarga el modelo `ggml-large-v3-turbo.bin` (~1.6 GB), un buen equilibrio entre precisión y velocidad en CPU.
+Recarga la configuración:
+
+```bash
+source ~/.bashrc
+```
 
 ### 4. Colocar el script
 
@@ -72,7 +72,7 @@ chmod +x ~/scripts/dictar.py
 2. Bajar a **Atajos personalizados**
 3. Pulsar **+** para añadir uno nuevo
 4. **Nombre**: `Dictar`
-5. **Comando**: `python3 /home/TU_USUARIO/dictate/dictar.py`
+5. **Comando**: `python3 /home/TU_USUARIO/scripts/dictar.py`
 6. Al pulsar "Definir atajo", presionar la tecla **Pause** (o la que prefieras)
 
 ## Uso
@@ -80,47 +80,43 @@ chmod +x ~/scripts/dictar.py
 1. Pulsa el atajo configurado.
 2. Habla con naturalidad. Puedes mezclar español con palabras en inglés.
 3. Vuelve a pulsar el atajo.
-4. Espera un segundo mientras Whisper transcribe.
+4. Espera 1-2 segundos mientras OpenAI transcribe.
 5. Pega el texto con `Ctrl+V`.
+
+## Coste
+
+El script usa el modelo **`gpt-transcribe`**, que cuesta aproximadamente **$0.0045 por minuto de audio**.
+
+| Uso estimado | Coste mensual aproximado |
+|---|---|
+| 20 segundos × 50 dictados/día × 20 días | ~$1.5 |
+| 1 hora de dictado | ~$0.27 |
+
+Consulta la [página de precios de OpenAI](https://openai.com/api/pricing/) para tarifas actualizadas.
 
 ## Personalización
 
-### Cambiar el modelo
+### Cambiar el prompt de contexto
 
-Edita la variable `MODEL_PATH` en `dictar.py` o descarga otro modelo:
+Edita la variable `PROMPT` en `dictar.py` para darle contexto al modelo:
 
-```bash
-cd ~/.local/src/whisper.cpp
-bash models/download-ggml-model.sh medium
+```python
+PROMPT = "Dictado informal de un desarrollador de software."
 ```
-
-Modelos recomendados:
-
-| Modelo | Precisión | Velocidad en CPU | RAM aprox. |
-|---|---|---|---|
-| `small` | Buena | Rápida | ~1 GB |
-| `medium` | Muy buena | Media | ~2.1 GB |
-| `large-v3-turbo` | Excelente | Rápida | ~2.3 GB |
-| `large-v3` | Máxima | Lenta | ~3.9 GB |
 
 ### Cambiar el idioma
 
-Edita la variable `LANGUAGE` en `dictar.py`. Algunos valores útiles:
-
-- `"es"` — español (predeterminado)
-- `"en"` — inglés
-- `"auto"` — detección automática (añade algo de latencia)
-
-### Añadir vocabulario propio
-
-Edita la variable `PROMPT` en `dictar.py` con palabras o frases que uses habitualmente. Esto ayuda a Whisper a reconocer nombres propios, tecnologías o jerga de tu campo.
+Edita la variable `LANGUAGES` en `dictar.py`:
 
 ```python
-PROMPT = (
-    "Git, npm, bun, Docker, Kubernetes, "
-    "aquí tus propias palabras."
-)
+LANGUAGES = ["es", "en"]  # español e inglés
 ```
+
+Otros ejemplos:
+
+- `["es"]` — solo español
+- `["en"]` — solo inglés
+- `["es", "en", "fr"]` — español, inglés y francés
 
 ### Cambiar el sonido de confirmación
 
@@ -135,24 +131,27 @@ Edita las llamadas a `play_sound(...)` en `dictar.py`. Algunos sonidos disponibl
 
 ## Solución de problemas
 
-### whisper-cli no se encuentra
+### "Error: no se encontró OPENAI_API_KEY"
 
-Asegúrate de que whisper.cpp se compiló correctamente:
-
-```bash
-ls ~/.local/src/whisper.cpp/build/bin/whisper-cli
-```
-
-### El modelo no se encuentra
+La variable de entorno no está definida. Verifica:
 
 ```bash
-ls ~/.local/src/whisper.cpp/models/ggml-large-v3-turbo.bin
+echo $OPENAI_API_KEY
 ```
 
-### La transcripción tarda mucho
+Si está vacía, añádela a tu `~/.bashrc` y recarga.
 
-- Prueba un modelo más pequeño (`medium` o `small`).
-- Asegúrate de que whisper.cpp se compiló con soporte OpenMP/AVX (debería hacerlo por defecto en x86_64).
+### "Error de autenticación con OpenAI"
+
+Tu API key es inválida o ha sido revocada. Genera una nueva en [platform.openai.com](https://platform.openai.com).
+
+### "No se pudo conectar con OpenAI"
+
+Comprueba tu conexión a internet. El script requiere acceso a `api.openai.com`.
+
+### "You have no credits remaining"
+
+Tu API key es válida pero la cuenta no tiene crédito. Añade crédito en [platform.openai.com/settings/organization/billing](https://platform.openai.com/settings/organization/billing).
 
 ### No se copia al portapapeles
 
@@ -162,6 +161,26 @@ Verifica que `wl-copy` está instalado:
 which wl-copy
 ```
 
+## Log de eventos
+
+El script guarda un log de la última ejecución en la misma carpeta donde esté `dictar.py`:
+
+```
+dictar.log
+```
+
+Úsalo para depurar problemas:
+
+```bash
+cat /ruta/a/dictar/dictar.log
+```
+
+El log se reinicia en cada ejecución, por lo que solo contiene información de la última vez que usaste el dictado. No guarda el texto transcrito.
+
+## Nota sobre privacidad
+
+Este script envía el audio grabado a los servidores de OpenAI para su transcripción. No uses esta versión si necesitas que el audio permanezca en tu equipo.
+
 ## Licencia
 
-El script `dictar.py` es de uso libre. whisper.cpp y los modelos Whisper tienen sus propias licencias (MIT y CC BY-SA 4.0 respectivamente).
+El script `dictar.py` es de uso libre.
