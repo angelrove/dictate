@@ -5,8 +5,9 @@ Script de dictado por voz para Linux/Wayland. Graba tu voz mientras mantienes un
 ## Características
 
 - **Pulsar atajo una vez**: inicia la grabación (suena confirmación).
-- **Pulsar atajo de nuevo**: detiene la grabación, transcribe con IA y copia el texto al portapapeles (suena confirmación).
-- **Pegar manualmente**: `Ctrl+V` donde quieras el texto.
+- **Pulsar atajo de nuevo**: detiene la grabación y transcribe con IA. Suena un aviso y el texto se pega automáticamente donde tengas el cursor.
+- **Aviso de "listo"**: un tono distinto suena justo cuando el texto ya está en el portapapeles, para que sepas cuándo puedes pegar.
+- **Pegado automático**: envía `Ctrl+Shift+V` con `ydotool` al terminar (se puede desactivar).
 - **Puntuación automática**: el modelo añade comas, puntos, interrogaciones y mayúsculas.
 - **Multilingüe**: entiende español mezclado con palabras sueltas en inglés.
 - **Rápido**: la transcripción corre en los servidores de OpenAI, no en tu CPU.
@@ -27,6 +28,7 @@ Script de dictado por voz para Linux/Wayland. Graba tu voz mientras mantienes un
 | `openai` | Cliente de la API de OpenAI |
 | `wl-clipboard` | Copiar texto al portapapeles de Wayland |
 | `pipewire` | Reproducir sonidos de confirmación |
+| `ydotool` | Pegar automáticamente el texto (opcional, requiere `ydotoold` activo) |
 
 ## Instalación
 
@@ -85,8 +87,8 @@ El script lee automáticamente `.env` si la variable de entorno no está definid
 1. Pulsa el atajo configurado.
 2. Habla con naturalidad. Puedes mezclar español con palabras en inglés.
 3. Vuelve a pulsar el atajo.
-4. Espera 1-2 segundos mientras OpenAI transcribe.
-5. Pega el texto con `Ctrl+V`.
+4. Espera 1-2 segundos mientras OpenAI transcribe. Al terminar suena un aviso y el texto se pega solo donde tengas el cursor.
+5. Si tienes el pegado automático desactivado, pega el texto con `Ctrl+Shift+V` (terminales) o `Ctrl+V` (apps gráficas).
 
 ## Coste
 
@@ -134,6 +136,41 @@ Edita las llamadas a `play_sound(...)` en `dictar.py`. Algunos sonidos disponibl
 /usr/share/sounds/freedesktop/stereo/message-new-instant.oga
 ```
 
+Hay tres momentos con sonido:
+
+- Al iniciar la grabación: `message-new-instant.oga`.
+- Al dejar de grabar (mientras transcribe): `bell.oga`.
+- Cuando el texto ya está listo: la constante `READY_SOUND` (`complete.oga`).
+
+### Activar o desactivar el pegado automático
+
+El pegado automático usa `ydotool` para enviar `Ctrl+Shift+V` a la ventana con foco. Para desactivarlo, edita `dictar.py`:
+
+```python
+AUTO_PASTE = False
+```
+
+Otras constantes relacionadas:
+
+```python
+PASTE_DELAY = 0.3   # segundos de margen antes de pegar
+PASTE_COMMAND = ["ydotool", "key", "29:1", "42:1", "47:1", "47:0", "42:0", "29:0"]  # Ctrl+Shift+V
+```
+
+`ydotool` necesita el demonio `ydotoold` en ejecución. Compruébalo con:
+
+```bash
+pgrep ydotoold
+```
+
+Si no aparece, actívalo como servicio de usuario:
+
+```bash
+systemctl --user enable --now ydotoold
+```
+
+> `Ctrl+Shift+V` es el pegado habitual en terminales (como la consola de OpenCode). En aplicaciones gráficas normales el pegado suele ser `Ctrl+V`; si dictas sobre todo en ellas, cambia `PASTE_COMMAND` por `["ydotool", "key", "29:1", "47:1", "47:0", "29:0"]`.
+
 ## Solución de problemas
 
 ### "Error: no se encontró OPENAI_API_KEY"
@@ -173,6 +210,23 @@ Verifica que `wl-copy` está instalado:
 ```bash
 which wl-copy
 ```
+
+### El texto no se pega automáticamente
+
+Comprueba que `ydotool` está instalado y que el demonio `ydotoold` está activo:
+
+```bash
+which ydotool
+pgrep ydotoold
+```
+
+Si `ydotoold` no está corriendo:
+
+```bash
+systemctl --user enable --now ydotoold
+```
+
+También verifica el log `dictar.log`; si aparece `Error al pegar automáticamente`, revisa los permisos de `/dev/uinput` (tu usuario debe pertenecer al grupo `input`). Si no consigues que funcione, pon `AUTO_PASTE = False` y pega con `Ctrl+Shift+V` o `Ctrl+V`.
 
 ## Log de eventos
 

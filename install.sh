@@ -19,6 +19,7 @@ sudo apt update
 sudo apt install -y \
     wl-clipboard \
     pipewire-audio-client-libraries \
+    ydotool \
     python3 \
     python3-pip
 
@@ -57,4 +58,7 @@ echo "  2. Configura el atajo de teclado en:"
 echo "     Configuración → Teclado → Atajos personalizados"
 echo "     Nombre: Dictar"
 echo "     Comando: python3 ${TARGET_LINK}"
+echo ""
+echo "  3. Para el pegado automático, asegúrate de tener el demonio ydotoold activo:"
+echo "     systemctl --user enable --now ydotoold"
 echo "=========================================="

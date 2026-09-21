@@ -79,6 +79,14 @@ PROMPT = "Dictado informal de un desarrollador de software."
 LANGUAGES = ["es", "en"]
 API_TIMEOUT = 30  # segundos máximo esperando respuesta de OpenAI
 
+# Sonido que avisa de que el texto ya está listo para pegar
+READY_SOUND = "/usr/share/sounds/freedesktop/stereo/complete.oga"
+
+# Pegado automático tras copiar al portapapeles
+AUTO_PASTE = True
+PASTE_DELAY = 0.3  # margen para que wl-copy termine de publicar el portapapeles
+PASTE_COMMAND = ["ydotool", "key", "29:1", "42:1", "47:1", "47:0", "42:0", "29:0"]  # Ctrl+Shift+V
+
 # Procesos globales para poder limpiarlos al salir
 stream = None
 wav_file = None
@@ -92,6 +100,21 @@ def play_sound(path):
         stderr=subprocess.DEVNULL,
         check=False,
     )
+
+
+def paste_text():
+    """Envía Ctrl+Shift+V a la ventana con foco usando ydotool."""
+    try:
+        subprocess.run(
+            PASTE_COMMAND,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=5,
+        )
+        log_info("Texto pegado automáticamente")
+    except Exception as e:
+        log_error("Error al pegar automáticamente: %s", e)
 
 
 def transcribe_audio():
@@ -195,6 +218,13 @@ def save_and_exit(signum, frame):
             check=False,
         )
         log_info("Texto copiado al portapapeles")
+
+        # Aviso sonoro de que el texto ya está disponible para pegar
+        play_sound(READY_SOUND)
+
+        if AUTO_PASTE:
+            time.sleep(PASTE_DELAY)
+            paste_text()
     else:
         log_info("No se copió nada al portapapeles (texto vacío)")
 
