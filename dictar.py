@@ -82,6 +82,9 @@ API_TIMEOUT = 30  # segundos máximo esperando respuesta de OpenAI
 # Sonido que avisa de que el texto ya está listo para pegar
 READY_SOUND = "/usr/share/sounds/freedesktop/stereo/complete.oga"
 
+# Sonido que avisa de que el pegado automático ha fallado
+ERROR_SOUND = "/usr/share/sounds/freedesktop/stereo/dialog-error.oga"
+
 # Pegado automático tras copiar al portapapeles
 AUTO_PASTE = True
 PASTE_DELAY = 0.3  # margen para que wl-copy termine de publicar el portapapeles
@@ -103,18 +106,26 @@ def play_sound(path):
 
 
 def paste_text():
-    """Envía Ctrl+Shift+V a la ventana con foco usando ydotool."""
+    """Envía Ctrl+Shift+V a la ventana con foco usando ydotool.
+
+    Devuelve True si el pegado se lanzó correctamente, False en caso contrario.
+    """
     try:
-        subprocess.run(
+        result = subprocess.run(
             PASTE_COMMAND,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
             timeout=5,
         )
+        if result.returncode != 0:
+            log_error("ydotool terminó con código %s", result.returncode)
+            return False
         log_info("Texto pegado automáticamente")
+        return True
     except Exception as e:
         log_error("Error al pegar automáticamente: %s", e)
+        return False
 
 
 def transcribe_audio():
@@ -219,12 +230,15 @@ def save_and_exit(signum, frame):
         )
         log_info("Texto copiado al portapapeles")
 
-        # Aviso sonoro de que el texto ya está disponible para pegar
-        play_sound(READY_SOUND)
-
+        # Con pegado automático el propio texto que aparece hace de aviso,
+        # así que solo sonamos READY_SOUND en modo manual. Si el pegado falla,
+        # avisamos con un tono de error para que el usuario pegue a mano.
         if AUTO_PASTE:
             time.sleep(PASTE_DELAY)
-            paste_text()
+            if not paste_text():
+                play_sound(ERROR_SOUND)
+        else:
+            play_sound(READY_SOUND)
     else:
         log_info("No se copió nada al portapapeles (texto vacío)")
 

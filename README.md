@@ -6,7 +6,8 @@ Script de dictado por voz para Linux/Wayland. Graba tu voz mientras mantienes un
 
 - **Pulsar atajo una vez**: inicia la grabación (suena confirmación).
 - **Pulsar atajo de nuevo**: detiene la grabación y transcribe con IA. Suena un aviso y el texto se pega automáticamente donde tengas el cursor.
-- **Aviso de "listo"**: un tono distinto suena justo cuando el texto ya está en el portapapeles, para que sepas cuándo puedes pegar.
+- **Aviso de "listo"**: con el pegado automático desactivado, un tono distinto suena justo cuando el texto ya está en el portapapeles, para que sepas cuándo puedes pegar. Con el pegado activo no hace falta: el propio texto que aparece hace de confirmación.
+- **Aviso de fallo al pegar**: si el pegado automático falla, suena un tono de error para que sepas que debes pegar a mano (el texto sigue en el portapapeles).
 - **Pegado automático**: envía `Ctrl+Shift+V` con `ydotool` al terminar (se puede desactivar).
 - **Puntuación automática**: el modelo añade comas, puntos, interrogaciones y mayúsculas.
 - **Multilingüe**: entiende español mezclado con palabras sueltas en inglés.
@@ -88,7 +89,7 @@ El script lee automáticamente `.env` si la variable de entorno no está definid
 2. Habla con naturalidad. Puedes mezclar español con palabras en inglés.
 3. Vuelve a pulsar el atajo.
 4. Espera 1-2 segundos mientras OpenAI transcribe. Al terminar suena un aviso y el texto se pega solo donde tengas el cursor.
-5. Si tienes el pegado automático desactivado, pega el texto con `Ctrl+Shift+V` (terminales) o `Ctrl+V` (apps gráficas).
+5. Si tienes el pegado automático desactivado, al terminar suena el tono de "listo" y pegas el texto con `Ctrl+Shift+V` (terminales) o `Ctrl+V` (apps gráficas).
 
 ## Coste
 
@@ -136,11 +137,12 @@ Edita las llamadas a `play_sound(...)` en `dictar.py`. Algunos sonidos disponibl
 /usr/share/sounds/freedesktop/stereo/message-new-instant.oga
 ```
 
-Hay tres momentos con sonido:
+Estos son los momentos con sonido:
 
 - Al iniciar la grabación: `message-new-instant.oga`.
 - Al dejar de grabar (mientras transcribe): `bell.oga`.
-- Cuando el texto ya está listo: la constante `READY_SOUND` (`complete.oga`).
+- Cuando el texto ya está listo, solo si el pegado automático está desactivado: la constante `READY_SOUND` (`complete.oga`).
+- Si el pegado automático falla: la constante `ERROR_SOUND` (`dialog-error.oga`).
 
 ### Activar o desactivar el pegado automático
 
@@ -226,7 +228,7 @@ Si `ydotoold` no está corriendo:
 systemctl --user enable --now ydotoold
 ```
 
-También verifica el log `dictar.log`; si aparece `Error al pegar automáticamente`, revisa los permisos de `/dev/uinput` (tu usuario debe pertenecer al grupo `input`). Si no consigues que funcione, pon `AUTO_PASTE = False` y pega con `Ctrl+Shift+V` o `Ctrl+V`.
+Cuando el pegado falla, el script reproduce `dialog-error.oga` y el texto permanece en el portapapeles, así que puedes pegarlo a mano. También verifica el log `dictar.log`; si aparece `Error al pegar automáticamente` o `ydotool terminó con código`, revisa los permisos de `/dev/uinput` (tu usuario debe pertenecer al grupo `input`). Si no consigues que funcione, pon `AUTO_PASTE = False` y pega con `Ctrl+Shift+V` o `Ctrl+V`.
 
 ## Log de eventos
 
